@@ -1,0 +1,10 @@
+# --- Secrets & Environment ---
+.env
+*.pem
+*.key
+credentials/
+
+# --- Local Container Data ---
+jenkins_home/
+.docker/
+docker-compose.override.yml
