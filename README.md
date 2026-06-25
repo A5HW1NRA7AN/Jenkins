@@ -44,3 +44,11 @@ Once initialized:
 * **Credentials:** JCasC automatically provisions `aws-credentials` and `github-credentials` in the credentials manager.
 * **Pipelines:** The two build pipeline jobs `telephony-missed-call` and `telephony-ivr` are auto-generated and configured to poll GitHub for commits every 5 minutes.
 * **Storage Persistence:** Jenkins configuration changes and logs are persisted locally in the `jenkins_data` Docker volume.
+
+---
+
+### 4. Reload JCasC Configuration Natively
+If you update any configuration in `casc.yaml` or change credentials in your system, you can immediately reload JCasC without restarting Jenkins by running:
+```bash
+curl -X POST -u "admin:<JENKINS_PASSWORD>" "http://localhost:8080/configuration-as-code/reload"
+```
