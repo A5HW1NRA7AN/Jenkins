@@ -21,6 +21,9 @@ RUN apt-get update && apt-get install -y \
     && unzip awscliv2.zip \
     && ./aws/install \
     && rm -rf awscliv2.zip aws \
+    && curl -LO "https://dl.k8s.io/release/v1.29.2/bin/linux/amd64/kubectl" \
+    && chmod +x kubectl \
+    && mv kubectl /usr/local/bin/ \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
