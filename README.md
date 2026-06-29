@@ -22,6 +22,9 @@ AWS_DEFAULT_REGION=ap-northeast-1
 # GitHub Credentials (required to clone the Telephony repo)
 GITHUB_USER=your_github_username
 GITHUB_TOKEN=ghp_yourPersonalAccessTokenHere
+
+# Optional: Override target repository URL (defaults to your personal Telephony fork)
+TELEPHONY_REPO_URL=https://github.com/Centre-for-Open-Societal-Systems/Telephony-Service.git
 ```
 
 ---
