@@ -1,57 +1,85 @@
-# Jenkins CI/CD Configuration-as-Code
+# Shared Jenkins (CI/CD) — Configuration-as-Code
 
-This repository provides a fully Dockerized, pre-configured Jenkins server running **Jenkins Configuration-as-Code (JCasC)**. It automatically registers necessary AWS ECR credentials and provisions your two branch-specific build pipelines:
-1. `telephony-missed-call` (missed call flow)
-2. `telephony-ivr` (multilingual IVR flow)
+A single, self-contained Jenkins service that runs the CI/CD pipelines for **multiple
+projects** from one host. Everything is declarative: the server image, its plugins, its
+credentials, and its pipeline jobs are all defined in this repository via **Jenkins
+Configuration-as-Code (JCasC)** and **Job DSL**, and the host itself is provisioned with
+**Terraform**.
 
-## Getting Started
+Jenkins runs on a dedicated AWS EC2 instance (region `ap-northeast-1`, Tokyo) with a static
+Elastic IP, so it is independent of any developer laptop.
 
-### 1. Configure Secrets
-Create a `.env` file in the root of this repository. This file is ignored by Git and will store your secure credentials:
+- **URL:** http://18.181.56.52:8080
+- **Instance:** `t3.large`, provisioned by [`terraform/`](terraform/)
+- **Build trigger:** manual only (no SCM polling)
 
-```ini
-# Administrator Dashboard Login
-JENKINS_ADMIN_USER=admin
-JENKINS_ADMIN_PASSWORD=your_secure_password_here
+## Projects served
 
-# AWS Access Credentials (required to push Docker images to ECR)
-AWS_ACCESS_KEY_ID=AKIAXXXXXXXXXXXXXXXX
-AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
-AWS_DEFAULT_REGION=ap-northeast-1
+| Job(s) | Source repo | What it does |
+|---|---|---|
+| `telephony-ec2`, `telephony-missed-call`, `telephony-ivr` | `Telephony-Service` (by branch) | Build & deploy the telephony FreeSWITCH variants. |
+| `agri-catalogue-service` | `Open-Agri-Stack/OAS-Infra` (drives the build) | Build the app image, push to ECR (`service-catalogue`), deploy to the K8s node via Helm over SSH. Requires the `EC2_HOST` build parameter. |
 
-# GitHub Credentials (required to clone the Telephony repo)
-GITHUB_USER=your_github_username
-GITHUB_TOKEN=ghp_yourPersonalAccessTokenHere
+The pipeline logic lives in each project's own `Jenkinsfile` (checked out via "Pipeline
+script from SCM"); this repo only defines the jobs and credentials that point at them.
 
-# Optional: Override target repository URL (defaults to your personal Telephony fork)
-TELEPHONY_REPO_URL=https://github.com/Centre-for-Open-Societal-Systems/Telephony-Service.git
-```
+## Repository layout
 
----
+- `Dockerfile` — the custom Jenkins image (JDK17 + Maven, Docker CLI, AWS CLI, `kubectl`, `openssh-client`).
+- `casc.yaml` — JCasC: security realm, credentials, and the Job DSL that provisions all pipeline jobs.
+- `docker-compose.yml` — runs the container (host Docker socket mounted, JVM/Maven memory caps, env from `.env`).
+- `plugins.txt` — plugins baked into the image.
+- `.env.example` — every environment variable the stack needs (copy to `.env` on the host).
+- `terraform/` — the EC2 instance, security group, Elastic IP association, and userdata bootstrap.
 
-### 2. Build and Launch Jenkins
-Build the custom image (pre-loading the plugins) and run the container in the background:
+## Credentials (provisioned by JCasC from `.env`)
+
+| ID | Type | Used by |
+|---|---|---|
+| `aws-credentials` | AWS key | ECR (all projects) |
+| `github-credentials` | username/token | SCM checkout (all projects) |
+| `ssh-private-key` | SSH key (ubuntu) | Telephony deploy targets |
+| `kubeconfig` | secret file | Telephony Kubernetes deploy |
+| `DB_CREDENTIALS` | username/password | agri-catalogue Postgres (`oas_user`) |
+| `ES_CREDENTIALS` | username/password | agri-catalogue Elasticsearch |
+| `ec2-deploy-key` | SSH key (ubuntu) | agri-catalogue K8s node deploy |
+
+## Running / updating the server
 
 ```bash
-# Build custom image & launch services
-docker-compose up -d --build
+# On the Jenkins host: fill in secrets, then build + start.
+cp .env.example .env      # edit .env with real values
+docker compose up -d --build
 ```
 
-Jenkins will be available at: **`http://localhost:8080`** (or your server's public IP).
+Reload JCasC after editing `casc.yaml` **without** rebuilding (config-only changes):
 
----
-
-### 3. Automatic Resource Configuration
-Once initialized:
-* **Admin Login:** Log in using the `JENKINS_ADMIN_USER` and `JENKINS_ADMIN_PASSWORD` you defined.
-* **Credentials:** JCasC automatically provisions `aws-credentials` and `github-credentials` in the credentials manager.
-* **Pipelines:** The two build pipeline jobs `telephony-missed-call` and `telephony-ivr` are auto-generated and configured to poll GitHub for commits every 5 minutes.
-* **Storage Persistence:** Jenkins configuration changes and logs are persisted locally in the `jenkins_data` Docker volume.
-
----
-
-### 4. Reload JCasC Configuration Natively
-If you update any configuration in `casc.yaml` or change credentials in your system, you can immediately reload JCasC without restarting Jenkins by running:
 ```bash
-curl -X POST -u "admin:<JENKINS_PASSWORD>" "http://localhost:8080/configuration-as-code/reload"
+curl -X POST -u "admin:<password>" "http://18.181.56.52:8080/configuration-as-code/reload"
 ```
+
+A rebuild (`docker compose up -d --build`) is required when the `Dockerfile`, `plugins.txt`,
+or the container environment changes.
+
+### Provision / change the host (Terraform)
+
+```bash
+cd terraform
+terraform init
+terraform plan     # should report no changes against the running instance
+terraform apply
+```
+
+The Elastic IP (`18.181.56.52`, `eipalloc-0d46f9e87aebd2da1`) is associated to the instance,
+so the URL is stable across rebuilds.
+
+## Onboarding a new project
+
+1. Add a `pipelineJob('<name>') { ... }` block to the `jobs:` list in `casc.yaml`, pointing
+   `cpsScm` at the project's repo and its `Jenkinsfile` (`scriptPath`). Add build parameters
+   if the pipeline needs them.
+2. Add any new credentials the project needs under `credentials.system.domainCredentials` in
+   `casc.yaml`, using `${ENV}` placeholders.
+3. Wire the matching env vars into `docker-compose.yml` and document them in `.env.example`.
+4. Update the host `.env`, then `docker compose up -d --build` (or reload JCasC if only
+   `casc.yaml` changed).

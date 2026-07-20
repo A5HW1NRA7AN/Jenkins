@@ -12,10 +12,18 @@ services:
       - ./casc.yaml:/usr/share/jenkins/ref/casc.yaml:ro
       # Mount host Docker socket to allow running docker commands
       - /var/run/docker.sock:/var/run/docker.sock
+    group_add:
+      - "988" # Docker group GID on the EC2 Ubuntu host
     environment:
       # Enable JCasC config location
       - CASC_JENKINS_CONFIG=/usr/share/jenkins/ref/casc.yaml
-      
+
+      # JVM/Maven memory caps to prevent OOM on the shared host.
+      # JAVA_OPTS here overrides the Dockerfile ENV, so the setup-wizard skip
+      # is repeated to keep it in effect.
+      - JAVA_OPTS=-Djenkins.install.runSetupWizard=false -Xmx2g -Xms512m -XX:+UseG1GC
+      - MAVEN_OPTS=-Xmx1g -Xms256m
+
       # Secrets placeholders to be injected from .env file or system env
       - JENKINS_ADMIN_USER=${JENKINS_ADMIN_USER:-admin}
       - JENKINS_ADMIN_PASSWORD=${JENKINS_ADMIN_PASSWORD:-admin123}
@@ -26,6 +34,17 @@ services:
       - GITHUB_USER=${GITHUB_USER}
       - SSH_PRIVATE_KEY=${SSH_PRIVATE_KEY}
       - KUBECONFIG_CONTENT=${KUBECONFIG_CONTENT}
+
+      # --- Telephony project ---
+      - TELEPHONY_REPO_URL=${TELEPHONY_REPO_URL:-https://github.com/Centre-for-Open-Societal-Systems/Telephony-Service.git}
+
+      # --- agri-catalogue-service (OAS) project ---
+      - OAS_DB_USERNAME=${OAS_DB_USERNAME}
+      - OAS_DB_PASSWORD=${OAS_DB_PASSWORD}
+      - OAS_ES_USERNAME=${OAS_ES_USERNAME}
+      - OAS_ES_PASSWORD=${OAS_ES_PASSWORD}
+      - OAS_NODE_SSH_PRIVATE_KEY=${OAS_NODE_SSH_PRIVATE_KEY}
+      - OAS_INFRA_REPO_URL=${OAS_INFRA_REPO_URL:-https://github.com/Open-Agri-Stack/OAS-Infra.git}
 
 volumes:
   jenkins_data:

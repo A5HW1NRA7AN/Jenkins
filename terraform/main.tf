@@ -1,0 +1,109 @@
+provider "aws" {
+  region = var.aws_region
+}
+
+# Declare default VPC and subnets
+resource "aws_default_vpc" "default" {}
+
+data "aws_subnets" "default" {
+  filter {
+    name   = "vpc-id"
+    values = [aws_default_vpc.default.id]
+  }
+}
+
+# Find latest Ubuntu 24.04 AMI
+data "aws_ami" "ubuntu_24" {
+  most_recent = true
+  owners      = ["099720109477"] # Canonical
+
+  filter {
+    name   = "name"
+    values = ["ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-*"]
+  }
+
+  filter {
+    name   = "virtualization-type"
+    values = ["hvm"]
+  }
+}
+
+# Auto-generate SSH Key Pair
+resource "tls_private_key" "jenkins_key" {
+  algorithm = "RSA"
+  rsa_bits  = 4096
+}
+
+resource "aws_key_pair" "jenkins_key_pair" {
+  key_name   = var.key_name
+  public_key = tls_private_key.jenkins_key.public_key_openssh
+}
+
+resource "local_sensitive_file" "private_key" {
+  content         = tls_private_key.jenkins_key.private_key_pem
+  filename        = "${path.module}/jenkins-key.pem"
+  file_permission = "0400"
+}
+
+# Security Group for Jenkins Server
+resource "aws_security_group" "jenkins_sg" {
+  name        = "jenkins-server-sg"
+  description = "Security Group for Jenkins Server"
+  vpc_id      = aws_default_vpc.default.id
+
+  # Allow SSH
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # Allow Jenkins UI
+  ingress {
+    from_port   = 8080
+    to_port     = 8080
+    protocol    = "tcp"
+    cidr_blocks = var.allowed_http_ingress_cidrs
+  }
+
+  # Outbound Internet Access
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "jenkins-server-sg"
+  }
+}
+
+# Jenkins EC2 Instance
+resource "aws_instance" "jenkins" {
+  ami                         = data.aws_ami.ubuntu_24.id
+  instance_type               = var.instance_type
+  key_name                    = aws_key_pair.jenkins_key_pair.key_name
+  vpc_security_group_ids      = [aws_security_group.jenkins_sg.id]
+  subnet_id                   = tolist(data.aws_subnets.default.ids)[0]
+  associate_public_ip_address = true
+
+  root_block_device {
+    volume_size           = 40
+    volume_type           = "gp3"
+    delete_on_termination = true
+  }
+
+  user_data = file("${path.module}/templates/userdata_jenkins.sh.tpl")
+
+  tags = {
+    Name = "Jenkins"
+  }
+}
+
+# Elastic IP for Jenkins Server (using existing unattached EIP)
+resource "aws_eip_association" "jenkins_eip_assoc" {
+  instance_id   = aws_instance.jenkins.id
+  allocation_id = "eipalloc-0d46f9e87aebd2da1" # existing free EIP: 18.181.56.52
+}

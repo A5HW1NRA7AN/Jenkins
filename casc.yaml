@@ -50,6 +50,35 @@ credentials:
               secretBytes: "${KUBECONFIG_CONTENT}"
               description: "Kubeconfig for Kubernetes remote deployments"
 
+          # --- agri-catalogue-service (OAS) credentials ---
+          # Postgres credentials for catalogue-service.
+          # username MUST equal service.config.yaml database.username (oas_user).
+          - usernamePassword:
+              scope: GLOBAL
+              id: "DB_CREDENTIALS"
+              username: "${OAS_DB_USERNAME}"
+              password: "${OAS_DB_PASSWORD}"
+              description: "Postgres credentials for agri-catalogue-service (oas_user)"
+
+          # Elasticsearch credentials for catalogue-service.
+          - usernamePassword:
+              scope: GLOBAL
+              id: "ES_CREDENTIALS"
+              username: "${OAS_ES_USERNAME}"
+              password: "${OAS_ES_PASSWORD}"
+              description: "Elasticsearch credentials for agri-catalogue-service"
+
+          # SSH private key for the OAS K8s node (user ubuntu). Distinct from the
+          # Telephony `ssh-private-key` above.
+          - basicSSHUserPrivateKey:
+              scope: GLOBAL
+              id: "ec2-deploy-key"
+              username: "ubuntu"
+              privateKeySource:
+                directEntry:
+                  privateKey: "${OAS_NODE_SSH_PRIVATE_KEY}"
+              description: "SSH key for the OAS K8s node (agri-catalogue-service deploy)"
+
 # Automatically create pipeline jobs using Job DSL
 jobs:
   - script: |
@@ -60,7 +89,7 @@ jobs:
             scm {
               git {
                 remote {
-                  url(System.getenv('TELEPHONY_REPO_URL') ?: 'https://github.com/' + System.getenv('GITHUB_USER') + '/Telephony.git')
+                  url(System.getenv('TELEPHONY_REPO_URL') ?: 'https://github.com/' + System.getenv('GITHUB_USER') + '/Telephony-Service.git')
                   credentials('github-credentials')
                 }
                 branch('*/freeswitch')
@@ -68,9 +97,6 @@ jobs:
             }
             scriptPath('Jenkinsfile')
           }
-        }
-        triggers {
-          scm('H/5 * * * *') // Poll GitHub every 5 minutes
         }
       }
   - script: |
@@ -81,7 +107,7 @@ jobs:
             scm {
               git {
                 remote {
-                  url(System.getenv('TELEPHONY_REPO_URL') ?: 'https://github.com/' + System.getenv('GITHUB_USER') + '/Telephony.git')
+                  url(System.getenv('TELEPHONY_REPO_URL') ?: 'https://github.com/' + System.getenv('GITHUB_USER') + '/Telephony-Service.git')
                   credentials('github-credentials')
                 }
                 branch('*/freeswitch-kubernetes')
@@ -89,9 +115,6 @@ jobs:
             }
             scriptPath('Jenkinsfile')
           }
-        }
-        triggers {
-          scm('H/5 * * * *') // Poll GitHub every 5 minutes
         }
       }
   - script: |
@@ -102,7 +125,7 @@ jobs:
             scm {
               git {
                 remote {
-                  url(System.getenv('TELEPHONY_REPO_URL') ?: 'https://github.com/' + System.getenv('GITHUB_USER') + '/Telephony.git')
+                  url(System.getenv('TELEPHONY_REPO_URL') ?: 'https://github.com/' + System.getenv('GITHUB_USER') + '/Telephony-Service.git')
                   credentials('github-credentials')
                 }
                 branch('*/freeswitch-ivr-kubernetes')
@@ -111,7 +134,28 @@ jobs:
             scriptPath('Jenkinsfile')
           }
         }
-        triggers {
-          scm('H/5 * * * *') // Poll GitHub every 5 minutes
+      }
+  - script: |
+      pipelineJob('agri-catalogue-service') {
+        description('CI/CD for agri-catalogue-service (OAS). OAS-Infra drives: checkout app, build image from the app Dockerfile, push to ECR, deploy via Helm on the K8s node.')
+        parameters {
+          stringParam('EC2_HOST', '', 'Public IP / DNS of the K8s node (terraform output: node_public_ip).')
         }
+        definition {
+          cpsScm {
+            scm {
+              git {
+                remote {
+                  url(System.getenv('OAS_INFRA_REPO_URL') ?: 'https://github.com/Open-Agri-Stack/OAS-Infra.git')
+                  credentials('github-credentials')
+                }
+                branch('*/main')
+              }
+            }
+            scriptPath('jenkins/Jenkinsfile')
+          }
+        }
+        // No SCM poll trigger: the pipeline requires the EC2_HOST parameter, so
+        // deploys are triggered manually (or via a parameterized webhook that
+        // supplies EC2_HOST from `terraform output node_public_ip`).
       }

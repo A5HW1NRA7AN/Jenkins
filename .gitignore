@@ -8,3 +8,12 @@ credentials/
 jenkins_home/
 .docker/
 docker-compose.override.yml
+
+# --- Terraform (state, provider plugins, plans) ---
+*.tfstate
+*.tfstate.*
+.terraform/
+tfplan
+
+# --- OS ---
+.DS_Store
