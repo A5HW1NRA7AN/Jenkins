@@ -36,7 +36,9 @@ services:
       - KUBECONFIG_CONTENT=${KUBECONFIG_CONTENT}
 
       # --- Telephony project ---
-      - TELEPHONY_REPO_URL=${TELEPHONY_REPO_URL:-https://github.com/Centre-for-Open-Societal-Systems/Telephony-Service.git}
+      # Empty default preserves the casc.yaml fallback (${GITHUB_USER}/Telephony-Service.git).
+      # Set this in .env only to pin/override the telephony source repo.
+      - TELEPHONY_REPO_URL=${TELEPHONY_REPO_URL:-}
 
       # --- agri-catalogue-service (OAS) project ---
       - OAS_DB_USERNAME=${OAS_DB_USERNAME}
