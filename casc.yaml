@@ -52,24 +52,33 @@ credentials:
 
           # --- agri-catalogue-service (OAS) credentials ---
           # Postgres credentials for catalogue-service.
-          # username MUST equal service.config.yaml database.username (oas_user).
-          - usernamePassword:
+          # Per-service Postgres PASSWORDS (secret text). The DB USERNAME is
+          # non-secret and read from services/<service>.config.yaml by the
+          # pipeline, so only the password lives here. IDs match the pipeline's
+          # db-password-${SERVICE} lookup. Values = db-host/.env ACS/OAS_DB_PASSWORD.
+          - string:
               scope: GLOBAL
-              id: "DB_CREDENTIALS"
-              username: "${OAS_DB_USERNAME}"
-              password: "${OAS_DB_PASSWORD}"
-              description: "Postgres credentials for agri-catalogue-service (oas_user)"
+              id: "db-password-agri-catalogue"
+              secret: "${ACS_DB_PASSWORD}"
+              description: "Postgres password for agri-catalogue (acs_user / acs_db)"
+          - string:
+              scope: GLOBAL
+              id: "db-password-organisation-catalogue"
+              secret: "${OAS_DB_PASSWORD}"
+              description: "Postgres password for organisation-catalogue (oas_user / oas_db)"
 
-          # Elasticsearch credentials for catalogue-service.
+          # Elasticsearch credentials (shared; ES security is disabled on the DB
+          # host so these are effectively ignored, but the app still sends them).
           - usernamePassword:
               scope: GLOBAL
               id: "ES_CREDENTIALS"
               username: "${OAS_ES_USERNAME}"
               password: "${OAS_ES_PASSWORD}"
-              description: "Elasticsearch credentials for agri-catalogue-service"
+              description: "Elasticsearch credentials for the catalogue services"
 
-          # SSH private key for the OAS K8s node (user ubuntu). Distinct from the
-          # Telephony `ssh-private-key` above.
+          # Shared SSH key for the OAS platform: authenticates BOTH the bastion
+          # (ProxyJump) and the private k8s node — it is the oas-uat terraform
+          # key pair (terraform/environments/oas-uat/oas-key.pem).
           - basicSSHUserPrivateKey:
               scope: GLOBAL
               id: "ec2-deploy-key"
@@ -77,7 +86,7 @@ credentials:
               privateKeySource:
                 directEntry:
                   privateKey: "${OAS_NODE_SSH_PRIVATE_KEY}"
-              description: "SSH key for the OAS K8s node (agri-catalogue-service deploy)"
+              description: "Shared SSH key for the OAS bastion + private k8s node (oas-uat)"
 
 # Automatically create pipeline jobs using Job DSL
 jobs:
@@ -139,7 +148,11 @@ jobs:
       pipelineJob('agri-catalogue-service') {
         description('CI/CD for agri-catalogue-service (OAS). OAS-Infra drives: checkout app, build image from the app Dockerfile, push to ECR, deploy via Helm on the K8s node.')
         parameters {
-          stringParam('EC2_HOST', '', 'Public IP / DNS of the K8s node (terraform output: node_public_ip).')
+          stringParam('SERVICE', 'agri-catalogue', 'Service to build/deploy — selects services/<SERVICE>.config.yaml.')
+          stringParam('BASTION_HOST', '', 'Bastion public IP (terraform output: bastion_public_ip) — SSH ProxyJump host.')
+          stringParam('NODE_PRIVATE_IP', '', 'K8s node private IP (terraform output: node_private_ip).')
+          stringParam('NGINX_HOST', '', 'nginx public IP (terraform output: nginx_public_ip) — used for the smoke test.')
+          stringParam('SMOKE_API_KEY', '', 'Optional Kong role key for the through-nginx smoke test; blank to skip.')
         }
         definition {
           cpsScm {
@@ -155,7 +168,32 @@ jobs:
             scriptPath('jenkins/Jenkinsfile')
           }
         }
-        // No SCM poll trigger: the pipeline requires the EC2_HOST parameter, so
-        // deploys are triggered manually (or via a parameterized webhook that
-        // supplies EC2_HOST from `terraform output node_public_ip`).
+        // No SCM poll trigger: the pipeline needs BASTION_HOST + NODE_PRIVATE_IP,
+        // so deploys are triggered manually (or via a parameterized webhook that
+        // supplies them from `terraform output` of the oas-uat environment).
+      }
+  - script: |
+      pipelineJob('organisation-catalogue') {
+        description('CI/CD for organisation-catalogue (OAS). OAS-Infra drives: checkout app, build image from the app Dockerfile, push to ECR, deploy via Helm on the K8s node.')
+        parameters {
+          stringParam('SERVICE', 'organisation-catalogue', 'Service to build/deploy — selects services/<SERVICE>.config.yaml.')
+          stringParam('BASTION_HOST', '', 'Bastion public IP (terraform output: bastion_public_ip) — SSH ProxyJump host.')
+          stringParam('NODE_PRIVATE_IP', '', 'K8s node private IP (terraform output: node_private_ip).')
+          stringParam('NGINX_HOST', '', 'nginx public IP (terraform output: nginx_public_ip) — used for the smoke test.')
+          stringParam('SMOKE_API_KEY', '', 'Optional Kong role key for the through-nginx smoke test; blank to skip.')
+        }
+        definition {
+          cpsScm {
+            scm {
+              git {
+                remote {
+                  url(System.getenv('OAS_INFRA_REPO_URL') ?: 'https://github.com/Open-Agri-Stack/OAS-Infra.git')
+                  credentials('github-credentials')
+                }
+                branch('*/main')
+              }
+            }
+            scriptPath('jenkins/Jenkinsfile')
+          }
+        }
       }
