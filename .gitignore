@@ -17,3 +17,7 @@ tfplan
 
 # --- OS ---
 .DS_Store
+
+# Terraform variable files may hold secrets (admin password, CIDRs)
+*.tfvars
+*.tfvars.json

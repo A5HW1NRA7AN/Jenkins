@@ -4,7 +4,7 @@ services:
     container_name: jenkins
     restart: unless-stopped
     ports:
-      - "8085:8080"
+      - "8080:8080"   # must match the Jenkins SG (opens 8080)
       - "50000:50000"
     volumes:
       - jenkins_data:/var/jenkins_home
@@ -40,8 +40,9 @@ services:
       # Set this in .env only to pin/override the telephony source repo.
       - TELEPHONY_REPO_URL=${TELEPHONY_REPO_URL:-}
 
-      # --- agri-catalogue-service (OAS) project ---
-      - OAS_DB_USERNAME=${OAS_DB_USERNAME}
+      # --- OAS catalogue services ---
+      # Per-service DB passwords (usernames are read from services/*.config.yaml).
+      - ACS_DB_PASSWORD=${ACS_DB_PASSWORD}
       - OAS_DB_PASSWORD=${OAS_DB_PASSWORD}
       - OAS_ES_USERNAME=${OAS_ES_USERNAME}
       - OAS_ES_PASSWORD=${OAS_ES_PASSWORD}
