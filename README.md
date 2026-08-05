@@ -18,7 +18,7 @@ Elastic IP, so it is independent of any developer laptop.
 | Job(s) | Source repo | What it does |
 |---|---|---|
 | `telephony-ec2`, `telephony-missed-call`, `telephony-ivr` | `Telephony-Service` (by branch) | Build & deploy the telephony FreeSWITCH variants. |
-| `agri-catalogue-service`, `organisation-catalogue` | `Open-Agri-Stack/OAS-Infra` (branch `main`, `jenkins/Jenkinsfile`) | Build the app image, push to ECR, deploy to the **private** K8s node **via bastion SSH ProxyJump** with Helm. Params: `SERVICE`, `BASTION_HOST`, `NODE_PRIVATE_IP`, `NGINX_HOST`, `SMOKE_API_KEY` (no more public `EC2_HOST`). Note: the agri job's `SERVICE` value is `agri-catalogue`, not the job name. |
+| `agri-catalogue-service`, `org-user-notification-services` | `Open-Agri-Stack/OAS-Infra` (branch `main`, `jenkins/Jenkinsfile`) | Build the app image, push to ECR, deploy to the **private** K8s node **via bastion SSH ProxyJump** with Helm. **No build parameters** — just press Build: the Jenkinsfile derives the service from the job name and auto-discovers the bastion/node/nginx IPs from the EC2 tags via `aws-credentials` (needs `ec2:DescribeInstances`). |
 
 The pipeline logic lives in each project's own `Jenkinsfile` (checked out via "Pipeline
 script from SCM"); this repo only defines the jobs and credentials that point at them.
@@ -41,7 +41,7 @@ script from SCM"); this repo only defines the jobs and credentials that point at
 | `ssh-private-key` | SSH key (ubuntu) | Telephony deploy targets |
 | `kubeconfig` | secret file | Telephony Kubernetes deploy |
 | `db-password-agri-catalogue` | secret text | agri Postgres password (user `acs_user`) |
-| `db-password-organisation-catalogue` | secret text | org Postgres password (user `oas_user`) |
+| `db-password-org-user-notification-services` | secret text | org Postgres password (user `oas_user`) |
 | `ES_CREDENTIALS` | username/password | Elasticsearch (both catalogue services) |
 | `ec2-deploy-key` | SSH key (ubuntu) | OAS bastion + private K8s node (deploy via ProxyJump) |
 

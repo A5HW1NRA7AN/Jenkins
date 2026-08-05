@@ -63,9 +63,9 @@ credentials:
               description: "Postgres password for agri-catalogue (acs_user / acs_db)"
           - string:
               scope: GLOBAL
-              id: "db-password-organisation-catalogue"
+              id: "db-password-org-user-notification-services"
               secret: "${OAS_DB_PASSWORD}"
-              description: "Postgres password for organisation-catalogue (oas_user / oas_db)"
+              description: "Postgres password for org-user-notification-services (oas_user / oas_db)"
 
           # Elasticsearch credentials (shared; ES security is disabled on the DB
           # host so these are effectively ignored, but the app still sends them).
@@ -146,14 +146,7 @@ jobs:
       }
   - script: |
       pipelineJob('agri-catalogue-service') {
-        description('CI/CD for agri-catalogue-service (OAS). OAS-Infra drives: checkout app, build image from the app Dockerfile, push to ECR, deploy via Helm on the K8s node.')
-        parameters {
-          stringParam('SERVICE', 'agri-catalogue', 'Service to build/deploy — selects services/<SERVICE>.config.yaml.')
-          stringParam('BASTION_HOST', '', 'Bastion public IP (terraform output: bastion_public_ip) — SSH ProxyJump host.')
-          stringParam('NODE_PRIVATE_IP', '', 'K8s node private IP (terraform output: node_private_ip).')
-          stringParam('NGINX_HOST', '', 'nginx public IP (terraform output: nginx_public_ip) — used for the smoke test.')
-          stringParam('SMOKE_API_KEY', '', 'Optional Kong role key for the through-nginx smoke test; blank to skip.')
-        }
+        description('CI/CD for agri-catalogue-service (OAS). Press-button deploy: no parameters — the Jenkinsfile derives SERVICE from the job name and auto-discovers the bastion/node/nginx IPs from EC2 tags via aws-credentials.')
         definition {
           cpsScm {
             scm {
@@ -168,20 +161,12 @@ jobs:
             scriptPath('jenkins/Jenkinsfile')
           }
         }
-        // No SCM poll trigger: the pipeline needs BASTION_HOST + NODE_PRIVATE_IP,
-        // so deploys are triggered manually (or via a parameterized webhook that
-        // supplies them from `terraform output` of the oas-uat environment).
+        // No trigger: deploys are manual (press Build). Everything the pipeline
+        // needs is auto-discovered — no parameters to fill in.
       }
   - script: |
-      pipelineJob('organisation-catalogue') {
-        description('CI/CD for organisation-catalogue (OAS). OAS-Infra drives: checkout app, build image from the app Dockerfile, push to ECR, deploy via Helm on the K8s node.')
-        parameters {
-          stringParam('SERVICE', 'organisation-catalogue', 'Service to build/deploy — selects services/<SERVICE>.config.yaml.')
-          stringParam('BASTION_HOST', '', 'Bastion public IP (terraform output: bastion_public_ip) — SSH ProxyJump host.')
-          stringParam('NODE_PRIVATE_IP', '', 'K8s node private IP (terraform output: node_private_ip).')
-          stringParam('NGINX_HOST', '', 'nginx public IP (terraform output: nginx_public_ip) — used for the smoke test.')
-          stringParam('SMOKE_API_KEY', '', 'Optional Kong role key for the through-nginx smoke test; blank to skip.')
-        }
+      pipelineJob('org-user-notification-services') {
+        description('CI/CD for org-user-notification-services (OAS). Press-button deploy: no parameters — the Jenkinsfile derives SERVICE from the job name and auto-discovers the bastion/node/nginx IPs from EC2 tags via aws-credentials.')
         definition {
           cpsScm {
             scm {
