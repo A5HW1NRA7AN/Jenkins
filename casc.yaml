@@ -67,6 +67,14 @@ credentials:
               secret: "${OAS_DB_PASSWORD}"
               description: "Postgres password for org-user-notification-services (oas_user / oas_db)"
 
+          # oas-auth-service: Keycloak client secret (from setup-realm.sh). No DB —
+          # the pipeline builds a k8s Secret with just KEYCLOAK_CLIENT_SECRET.
+          - string:
+              scope: GLOBAL
+              id: "keycloak-client-secret"
+              secret: "${KEYCLOAK_CLIENT_SECRET}"
+              description: "Keycloak client secret for oas-auth-service"
+
           # Elasticsearch credentials (shared; ES security is disabled on the DB
           # host so these are effectively ignored, but the app still sends them).
           - usernamePassword:
@@ -167,6 +175,24 @@ jobs:
   - script: |
       pipelineJob('org-user-notification-services') {
         description('CI/CD for org-user-notification-services (OAS). Press-button deploy: no parameters — the Jenkinsfile derives SERVICE from the job name and auto-discovers the bastion/node/nginx IPs from EC2 tags via aws-credentials.')
+        definition {
+          cpsScm {
+            scm {
+              git {
+                remote {
+                  url(System.getenv('OAS_INFRA_REPO_URL') ?: 'https://github.com/Open-Agri-Stack/OAS-Infra.git')
+                  credentials('github-credentials')
+                }
+                branch('*/main')
+              }
+            }
+            scriptPath('jenkins/Jenkinsfile')
+          }
+        }
+      }
+  - script: |
+      pipelineJob('oas-auth-service') {
+        description('CI/CD for oas-auth-service (OAS). Press-button deploy: no parameters. ClusterIP-only, NO Kong route; uses the keycloak-client-secret credential (no DB).')
         definition {
           cpsScm {
             scm {
