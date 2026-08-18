@@ -44,6 +44,8 @@ services:
       # Per-service DB passwords (usernames are read from services/*.config.yaml).
       - ACS_DB_PASSWORD=${ACS_DB_PASSWORD}
       - OAS_DB_PASSWORD=${OAS_DB_PASSWORD}
+      # oas-auth-service: Keycloak client secret (JCasC cred keycloak-client-secret).
+      - KEYCLOAK_CLIENT_SECRET=${KEYCLOAK_CLIENT_SECRET}
       - OAS_ES_USERNAME=${OAS_ES_USERNAME}
       - OAS_ES_PASSWORD=${OAS_ES_PASSWORD}
       - OAS_NODE_SSH_PRIVATE_KEY=${OAS_NODE_SSH_PRIVATE_KEY}
