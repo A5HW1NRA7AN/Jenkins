@@ -3,12 +3,15 @@ FROM jenkins/jenkins:lts-jdk17
 # Run as root to install Docker CLI, AWS CLI, and Maven
 USER root
 
-# Install dependencies, Docker CLI, AWS CLI, and Maven
+# Install dependencies, Docker CLI, AWS CLI, and Maven.
+# jq: required by the OAS auth pipeline's realm-configuration stage, which runs the
+# app repo's setup-realm.sh (a jq-heavy Keycloak Admin API script) on this agent.
 RUN apt-get update && apt-get install -y \
     apt-transport-https \
     ca-certificates \
     curl \
     gnupg \
+    jq \
     lsb-release \
     unzip \
     openssh-client \

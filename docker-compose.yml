@@ -46,6 +46,10 @@ services:
       - OAS_DB_PASSWORD=${OAS_DB_PASSWORD}
       # oas-auth-service: Keycloak client secret (JCasC cred keycloak-client-secret).
       - KEYCLOAK_CLIENT_SECRET=${KEYCLOAK_CLIENT_SECRET}
+      # Keycloak master admin (JCasC cred keycloak-admin) — used ONLY by the pipeline's
+      # realm-configuration stage. The application never sees these.
+      - KEYCLOAK_ADMIN_USER=${KEYCLOAK_ADMIN_USER:-admin}
+      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD}
       - OAS_ES_USERNAME=${OAS_ES_USERNAME}
       - OAS_ES_PASSWORD=${OAS_ES_PASSWORD}
       - OAS_NODE_SSH_PRIVATE_KEY=${OAS_NODE_SSH_PRIVATE_KEY}

@@ -75,6 +75,17 @@ credentials:
               secret: "${KEYCLOAK_CLIENT_SECRET}"
               description: "Keycloak client secret for oas-auth-service"
 
+          # Keycloak MASTER admin — used ONLY by the oas-auth-service pipeline's
+          # realm-configuration stage, which runs the app's setup-realm.sh against the
+          # live Keycloak over a bastion tunnel. It never reaches the application: the
+          # app administers users as its own client service account.
+          - usernamePassword:
+              scope: GLOBAL
+              id: "keycloak-admin"
+              username: "${KEYCLOAK_ADMIN_USER}"
+              password: "${KEYCLOAK_ADMIN_PASSWORD}"
+              description: "Keycloak master admin (realm configuration only)"
+
           # Elasticsearch credentials (shared; ES security is disabled on the DB
           # host so these are effectively ignored, but the app still sends them).
           - usernamePassword:
