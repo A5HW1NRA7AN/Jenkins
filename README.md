@@ -17,11 +17,12 @@ Elastic IP, so it is independent of any developer laptop.
 
 | Job(s) | Source repo | What it does |
 |---|---|---|
-| `telephony-ec2`, `telephony-missed-call`, `telephony-ivr` | `Telephony-Service` (by branch) | Build & deploy the telephony FreeSWITCH variants. |
+| `telephony-ec2`, `telephony-missed-call`, `telephony-ivr` | `Telephony-Infrastructure` (branch `main`, `jenkins/Jenkinsfile-{ec2,k8s}`) | Build & deploy the telephony FreeSWITCH variants. The pipeline derives the variant from the job name, then checks out `Telephony-Service` at the matching branch (`freeswitch` or `freeswitch-ivr`) to build the images. |
 | `agri-catalogue-service`, `org-user-notification-services` | `Open-Agri-Stack/OAS-Infra` (branch `main`, `jenkins/Jenkinsfile`) | Build the app image, push to ECR, deploy to the **private** K8s node **via bastion SSH ProxyJump** with Helm. **No build parameters** — just press Build: the Jenkinsfile derives the service from the job name and auto-discovers the bastion/node/nginx IPs from the EC2 tags via `aws-credentials` (needs `ec2:DescribeInstances`). |
 
-The pipeline logic lives in each project's own `Jenkinsfile` (checked out via "Pipeline
-script from SCM"); this repo only defines the jobs and credentials that point at them.
+The pipeline logic lives in each project's **infrastructure** repo (checked out via
+"Pipeline script from SCM"); this repo only defines the jobs and credentials that point
+at them. No job is pinned to an application branch.
 
 ## Repository layout
 
@@ -40,6 +41,9 @@ script from SCM"); this repo only defines the jobs and credentials that point at
 | `github-credentials` | username/token | SCM checkout (all projects) |
 | `ssh-private-key` | SSH key (ubuntu) | Telephony deploy targets |
 | `kubeconfig` | secret file | Telephony Kubernetes deploy |
+| `postgres-password` | secret text | Telephony `lead_db` password (user `lead_user`) |
+| `pgadmin-password` | secret text | Telephony pgAdmin login |
+| `freeswitch-esl-password` | secret text | FreeSWITCH Event Socket password |
 | `db-password-agri-catalogue` | secret text | agri Postgres password (user `acs_user`) |
 | `db-password-org-user-notification-services` | secret text | org Postgres password (user `oas_user`) |
 | `ES_CREDENTIALS` | username/password | Elasticsearch (both catalogue services) |

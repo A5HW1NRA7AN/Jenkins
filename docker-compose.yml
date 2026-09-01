@@ -36,9 +36,17 @@ services:
       - KUBECONFIG_CONTENT=${KUBECONFIG_CONTENT}
 
       # --- Telephony project ---
-      # Empty default preserves the casc.yaml fallback (${GITHUB_USER}/Telephony-Service.git).
-      # Set this in .env only to pin/override the telephony source repo.
+      # Empty defaults preserve the casc.yaml fallbacks
+      # (${GITHUB_USER}/Telephony-Service.git and .../Telephony-Infrastructure.git).
+      # Set these in .env only to pin/override the repos.
+      # INFRA_REPO_URL is where the telephony pipelines now live.
+      - INFRA_REPO_URL=${INFRA_REPO_URL:-}
       - TELEPHONY_REPO_URL=${TELEPHONY_REPO_URL:-}
+      # Deployment secrets consumed by the telephony pipelines
+      # (JCasC creds postgres-password, pgadmin-password, freeswitch-esl-password).
+      - TELEPHONY_POSTGRES_PASSWORD=${TELEPHONY_POSTGRES_PASSWORD}
+      - TELEPHONY_PGADMIN_PASSWORD=${TELEPHONY_PGADMIN_PASSWORD}
+      - TELEPHONY_ESL_PASSWORD=${TELEPHONY_ESL_PASSWORD}
 
       # --- OAS catalogue services ---
       # Per-service DB passwords (usernames are read from services/*.config.yaml).

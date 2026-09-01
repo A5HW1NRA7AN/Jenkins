@@ -50,6 +50,26 @@ credentials:
               secretBytes: "${KUBECONFIG_CONTENT}"
               description: "Kubeconfig for Kubernetes remote deployments"
 
+          # Telephony deployment secrets. Consumed by
+          # Telephony-Infrastructure/jenkins/Jenkinsfile-{ec2,k8s}; the
+          # pipelines fail the build if any of these is missing rather than
+          # falling back to a default.
+          - string:
+              scope: GLOBAL
+              id: "postgres-password"
+              secret: "${TELEPHONY_POSTGRES_PASSWORD}"
+              description: "Postgres password for the telephony lead_db (lead_user)"
+          - string:
+              scope: GLOBAL
+              id: "pgadmin-password"
+              secret: "${TELEPHONY_PGADMIN_PASSWORD}"
+              description: "pgAdmin login password for the telephony stack"
+          - string:
+              scope: GLOBAL
+              id: "freeswitch-esl-password"
+              secret: "${TELEPHONY_ESL_PASSWORD}"
+              description: "FreeSWITCH Event Socket (ESL) password"
+
           # --- agri-catalogue-service (OAS) credentials ---
           # Postgres credentials for catalogue-service.
           # Per-service Postgres PASSWORDS (secret text). The DB USERNAME is
@@ -110,56 +130,42 @@ credentials:
 # Automatically create pipeline jobs using Job DSL
 jobs:
   - script: |
-      pipelineJob('telephony-ec2') {
-        description('Pipeline for the Standalone EC2 Deployment')
-        definition {
-          cpsScm {
-            scm {
-              git {
-                remote {
-                  url(System.getenv('TELEPHONY_REPO_URL') ?: 'https://github.com/' + System.getenv('GITHUB_USER') + '/Telephony-Service.git')
-                  credentials('github-credentials')
-                }
-                branch('*/freeswitch')
-              }
-            }
-            scriptPath('Jenkinsfile')
+      // Telephony pipelines live in the Telephony-Infrastructure repository.
+      // The application repo is checked out by the Jenkinsfile at the branch
+      // the pipeline derives from the job name, so nothing here is pinned to
+      // an application branch any more.
+      def infraRepo = System.getenv('INFRA_REPO_URL') ?: 'https://github.com/' + System.getenv('GITHUB_USER') + '/Telephony-Infrastructure.git'
+      def appRepo   = System.getenv('TELEPHONY_REPO_URL') ?: ''
+
+      [
+        [name: 'telephony-ec2',
+         desc: 'Standalone EC2 (Docker Compose) deployment. Builds the freeswitch branch of Telephony-Service.',
+         path: 'jenkins/Jenkinsfile-ec2'],
+        [name: 'telephony-missed-call',
+         desc: 'Kubernetes deployment, missed-call campaign. Builds the freeswitch branch of Telephony-Service.',
+         path: 'jenkins/Jenkinsfile-k8s'],
+        [name: 'telephony-ivr',
+         desc: 'Kubernetes deployment, multilingual IVR campaign. Builds the freeswitch-ivr branch of Telephony-Service.',
+         path: 'jenkins/Jenkinsfile-k8s'],
+      ].each { job ->
+        pipelineJob(job.name) {
+          description(job.desc)
+          parameters {
+            stringParam('APP_REPO_URL', appRepo, 'Telephony-Service git URL. Blank falls back to the TELEPHONY_REPO_URL environment variable.')
           }
-        }
-      }
-  - script: |
-      pipelineJob('telephony-missed-call') {
-        description('Pipeline for the Missed Call Campaign variant')
-        definition {
-          cpsScm {
-            scm {
-              git {
-                remote {
-                  url(System.getenv('TELEPHONY_REPO_URL') ?: 'https://github.com/' + System.getenv('GITHUB_USER') + '/Telephony-Service.git')
-                  credentials('github-credentials')
+          definition {
+            cpsScm {
+              scm {
+                git {
+                  remote {
+                    url(infraRepo)
+                    credentials('github-credentials')
+                  }
+                  branch('*/main')
                 }
-                branch('*/freeswitch-kubernetes')
               }
+              scriptPath(job.path)
             }
-            scriptPath('Jenkinsfile')
-          }
-        }
-      }
-  - script: |
-      pipelineJob('telephony-ivr') {
-        description('Pipeline for the Multilingual IVR Campaign variant')
-        definition {
-          cpsScm {
-            scm {
-              git {
-                remote {
-                  url(System.getenv('TELEPHONY_REPO_URL') ?: 'https://github.com/' + System.getenv('GITHUB_USER') + '/Telephony-Service.git')
-                  credentials('github-credentials')
-                }
-                branch('*/freeswitch-ivr-kubernetes')
-              }
-            }
-            scriptPath('Jenkinsfile')
           }
         }
       }
