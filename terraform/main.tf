@@ -102,8 +102,4 @@ resource "aws_instance" "jenkins" {
   }
 }
 
-# Elastic IP for Jenkins Server (using existing unattached EIP)
-resource "aws_eip_association" "jenkins_eip_assoc" {
-  instance_id   = aws_instance.jenkins.id
-  allocation_id = "eipalloc-0d46f9e87aebd2da1" # existing free EIP: 18.181.56.52
-}
+
